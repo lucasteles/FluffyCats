@@ -16,32 +16,30 @@ namespace SomeCats
     /// </summary>
     public partial class MainWindow : Window
     {
-        static readonly ConcurrentStack<string> cache = new ConcurrentStack<string>();
+        static readonly BlockingCollection<string> cache = new BlockingCollection<string>();
         static readonly SemaphoreSlim semaphore = new SemaphoreSlim(5);
 
         public MainWindow() => InitializeComponent();
-        async void Window_Loaded(object sender, RoutedEventArgs e) => await cuteLoop();
-        async void AnimationCompleted(object sender, RoutedEventArgs e) => await cuteLoop();
-
-
-        async Task cuteLoop()
+        async void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            await Task.WhenAny(
-                    Enumerable.Range(0, 5 - cache.Count)
-                    .Do(_ => semaphore.Wait())
-                    .Select(async _ => cache.Push(await getFluffyCat()))
-                    .Select(x => x.ContinueWith(_ => semaphore.Release()))
-                    .Append(fillScreenWithLove())
-                    );
-
-
+            Task.Run(cuteLoop);
+            fillScreenWithLove();
         }
 
-        async Task fillScreenWithLove()
+        async void AnimationCompleted(object sender, RoutedEventArgs e) => fillScreenWithLove();
+
+        async static Task cuteLoop() =>
+            await Task.WhenAll(
+                        EnumerableEx
+                        .Return(0)
+                        .Repeat()
+                        .Do(_ => semaphore.Wait())
+                        .Select(async _ => cache.Add(await getFluffyCat()))
+                    );
+
+        void fillScreenWithLove()
         {
-            string file;
-            while (!cache.TryPop(out file))
-                await Task.Delay(500);
+            var file = cache.Take();
 
             var image = new BitmapImage();
             image.BeginInit();
@@ -49,6 +47,7 @@ namespace SomeCats
             image.EndInit();
 
             SetAnimatedSource(imagemControle, image);
+            semaphore.Release();
         }
 
         static async Task<string> getFluffyCat()
