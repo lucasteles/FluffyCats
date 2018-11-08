@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Imaging;
@@ -16,33 +17,31 @@ namespace SomeCats
     public partial class MainWindow : Window
     {
         static readonly ConcurrentStack<string> cache = new ConcurrentStack<string>();
+        static readonly SemaphoreSlim semaphore = new SemaphoreSlim(5);
 
-        public MainWindow()
-        {
-            InitializeComponent();
-        }
+        public MainWindow() => InitializeComponent();
+        async void Window_Loaded(object sender, RoutedEventArgs e) => await cuteLoop();
+        async void AnimationCompleted(object sender, RoutedEventArgs e) => await cuteLoop();
 
-        async void Window_Loaded(object sender, RoutedEventArgs e)
+
+        async Task cuteLoop()
         {
             await Task.WhenAny(
-                     Enumerable.Range(0, 3)
-                     .Select(_ => LoadSomeCute())
-                 );
+                    Enumerable.Range(0, 5 - cache.Count)
+                    .Do(_ => semaphore.Wait())
+                    .Select(async _ => cache.Push(await getFluffyCat()))
+                    .Select(x => x.ContinueWith(_ => semaphore.Release()))
+                    .Append(fillScreenWithLove())
+                    );
 
-            SetImage();
+
         }
 
-
-        async Task LoadSomeCute()
+        async Task fillScreenWithLove()
         {
-            var catFile = await GetFluffyCat();
-            cache.Push(catFile);
-        }
-
-        void SetImage()
-        {
-            if (!cache.TryPop(out var file))
-                return;
+            string file;
+            while (!cache.TryPop(out file))
+                await Task.Delay(500);
 
             var image = new BitmapImage();
             image.BeginInit();
@@ -52,13 +51,7 @@ namespace SomeCats
             SetAnimatedSource(imagemControle, image);
         }
 
-        async void AnimationCompleted(object sender, RoutedEventArgs e)
-        {
-            SetImage();
-            await LoadSomeCute();
-        }
-
-        static async Task<string> GetFluffyCat()
+        static async Task<string> getFluffyCat()
         {
             var file = Path.GetTempFileName();
             const string url = "https://cataas.com/cat/gif?filter=cute";
@@ -71,7 +64,6 @@ namespace SomeCats
                     stream.CopyTo(fs);
 
                 return file;
-
             }
         }
 
