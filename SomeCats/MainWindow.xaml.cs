@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,15 +19,19 @@ namespace SomeCats
     {
         static readonly BlockingCollection<string> cache = new BlockingCollection<string>();
         static readonly SemaphoreSlim semaphore = new SemaphoreSlim(5);
+        static HttpClient httpClient = new HttpClient();
 
         public MainWindow() => InitializeComponent();
-        async void Window_Loaded(object sender, RoutedEventArgs e)
+        void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            Task.Run(cuteLoop);
+            //cataas is with invalid certificate --  dirt =/
+            ServicePointManager.ServerCertificateValidationCallback += (sender2, cert, chain, sslPolicyErrors) => true;
+
+            _ = Task.Run(cuteLoop);
             fillScreenWithLove();
         }
 
-        async void AnimationCompleted(object sender, RoutedEventArgs e) => fillScreenWithLove();
+        void AnimationCompleted(object sender, RoutedEventArgs e) => fillScreenWithLove();
 
         async static Task cuteLoop() =>
             await Task.WhenAll(
@@ -55,15 +60,12 @@ namespace SomeCats
             var file = Path.GetTempFileName();
             const string url = "https://cataas.com/cat/gif?filter=cute";
 
-            using (var httpClient = new HttpClient())
-            {
-                var response = await httpClient.GetAsync(url);
-                var stream = await response.Content.ReadAsStreamAsync();
-                using (var fs = File.Create(file))
-                    stream.CopyTo(fs);
+            var response = await httpClient.GetAsync(url);
+            var stream = await response.Content.ReadAsStreamAsync();
+            using (var fs = File.Create(file))
+                stream.CopyTo(fs);
 
-                return file;
-            }
+            return file;
         }
 
     }
