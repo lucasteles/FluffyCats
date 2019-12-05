@@ -1,51 +1,55 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Net.Http;
-using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Imaging;
 using static WpfAnimatedGif.ImageBehavior;
+using CatFileName = System.String;
+
 
 namespace SomeCats
 {
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
     public partial class MainWindow : Window
     {
-        static readonly BlockingCollection<string> cache = new BlockingCollection<string>();
-        static readonly SemaphoreSlim semaphore = new SemaphoreSlim(5);
+        const int MAX_GIFS = 5;
+
+        static ChannelReader<CatFileName> catReader;
         static HttpClient httpClient = new HttpClient();
 
         public MainWindow() => InitializeComponent();
-        void Window_Loaded(object sender, RoutedEventArgs e)
-        {
-            //cataas is with invalid certificate --  dirt =/
-            ServicePointManager.ServerCertificateValidationCallback += (sender2, cert, chain, sslPolicyErrors) => true;
 
-            _ = Task.Run(cuteLoop);
-            fillScreenWithLove();
+        async void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            var channel = Channel.CreateBounded<string>(MAX_GIFS);
+            catReader = channel.Reader;
+
+            _ = Task.Run(() => cuteLoop(channel.Writer));
+            await fillScreenWithLove();
         }
 
-        void AnimationCompleted(object sender, RoutedEventArgs e) => fillScreenWithLove();
+        async void AnimationCompleted(object sender, RoutedEventArgs e) => await fillScreenWithLove();
 
-        async static Task cuteLoop() =>
-            await Task.WhenAll(
-                        EnumerableEx
-                        .Return(0)
-                        .Repeat()
-                        .Do(_ => semaphore.Wait())
-                        .Select(async _ => cache.Add(await getFluffyCat()))
-                    );
-
-        void fillScreenWithLove()
+        async static Task cuteLoop(ChannelWriter<string> catWriter)
         {
-            var file = cache.Take();
+            async Task WriteCat()
+            {
+                while (true) await catWriter.WriteAsync(await getFluffyCat());
+            };
+
+            await Task.WhenAll(
+                    Enumerable
+                        .Range(0, MAX_GIFS)
+                        .Select(_ => WriteCat()));
+
+        }
+
+        async Task fillScreenWithLove()
+        {
+            var file = await catReader.ReadAsync();
 
             var image = new BitmapImage();
             image.BeginInit();
@@ -53,16 +57,16 @@ namespace SomeCats
             image.EndInit();
 
             SetAnimatedSource(imagemControle, image);
-            semaphore.Release();
         }
 
-        static async Task<string> getFluffyCat()
+        static async Task<CatFileName> getFluffyCat()
         {
             var file = Path.GetTempFileName();
             const string url = "https://cataas.com/cat/gif?filter=cute";
 
-            Debug.WriteLine("Mais um tananan");
             var response = await httpClient.GetAsync(url);
+            Debug.WriteLine("Mais um tanananan");
+
             var stream = await response.Content.ReadAsStreamAsync();
             using (var fs = File.Create(file))
                 stream.CopyTo(fs);
