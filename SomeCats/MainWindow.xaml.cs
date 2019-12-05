@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -60,6 +61,7 @@ namespace SomeCats
             var file = Path.GetTempFileName();
             const string url = "https://cataas.com/cat/gif?filter=cute";
 
+            Debug.WriteLine("Mais um tananan");
             var response = await httpClient.GetAsync(url);
             var stream = await response.Content.ReadAsStreamAsync();
             using (var fs = File.Create(file))
