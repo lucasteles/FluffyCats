@@ -1,18 +1,19 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
-  <PropertyGroup>
-    <TargetFramework>netcoreapp3.0</TargetFramework>
-    <OutputType>WinExe</OutputType>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <UseWPF>true</UseWPF>
-  </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="System.Interactive" Version="3.2.0" />
-    <PackageReference Include="WpfAnimatedGif" Version="1.4.17" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="System.Data.DataSetExtensions" Version="4.5.0" />
-  </ItemGroup>
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <TargetFramework>net8.0-windows</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <UseWPF>true</UseWPF>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="System.Interactive" Version="6.0.3" />
+        <PackageReference Include="WpfAnimatedGif" Version="2.0.2" />
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="Microsoft.CSharp" Version="4.7.0"/>
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="System.Data.DataSetExtensions" Version="4.5.0"/>
+    </ItemGroup>
 </Project>

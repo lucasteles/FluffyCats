@@ -1,78 +1,87 @@
-﻿using System;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Net.Http;
 using System.Threading.Channels;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Imaging;
+
+namespace SomeCats;
+
 using static WpfAnimatedGif.ImageBehavior;
-using CatFileName = System.String;
+using CatFileName = string;
 
-
-namespace SomeCats
+public partial class MainWindow
 {
-    public partial class MainWindow : Window
+    const int MaxGifs = 5;
+    const CatFileName Url = "https://cataas.com/cat/gif?position=center";
+    static readonly HttpClient HttpClient = new();
+    readonly Channel<CatFileName> channel;
+    readonly CancellationTokenSource cts = new();
+    Task? loopTask;
+
+    public MainWindow()
     {
-        const int MAX_GIFS = 5;
+        InitializeComponent();
+        channel = Channel.CreateBounded<CatFileName>(MaxGifs);
+    }
 
-        static ChannelReader<CatFileName> catReader;
-        static HttpClient httpClient = new HttpClient();
+    void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        loopTask = Task.Run(CuteLoop, cts.Token);
+        NextGif();
+    }
 
-        public MainWindow() => InitializeComponent();
+    void Window_OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (cts.IsCancellationRequested) return;
+        cts.Cancel();
+        if (loopTask?.IsCompleted is false)
+            loopTask?.GetAwaiter().GetResult();
+    }
 
-        async void Window_Loaded(object sender, RoutedEventArgs e)
+    void AnimationCompleted(object sender, RoutedEventArgs e) => NextGif();
+
+    async Task CuteLoop() =>
+        await Task.WhenAll(
+            Enumerable
+                .Range(0, MaxGifs)
+                .Select(async _ =>
+                {
+                    while (!cts.IsCancellationRequested)
+                        await channel.Writer.WriteAsync(await GetFluffyCat(), cts.Token);
+                }));
+
+    async void NextGif()
+    {
+        try
         {
-            var channel = Channel.CreateBounded<string>(MAX_GIFS);
-            catReader = channel.Reader;
-
-            _ = Task.Run(() => cuteLoop(channel.Writer));
-            await fillScreenWithLove();
+            await FillScreenWithLove();
         }
-
-        async void AnimationCompleted(object sender, RoutedEventArgs e) => await fillScreenWithLove();
-
-        async static Task cuteLoop(ChannelWriter<string> catWriter)
+        catch (Exception exception)
         {
-            async Task WriteCat()
-            {
-                while (true) await catWriter.WriteAsync(await getFluffyCat());
-            };
-
-            await Task.WhenAll(
-                    Enumerable
-                        .Range(0, MAX_GIFS)
-                        .Select(_ => WriteCat()));
-
+            Console.Error.Write(exception);
         }
+    }
 
-        async Task fillScreenWithLove()
-        {
-            var file = await catReader.ReadAsync();
+    async Task FillScreenWithLove()
+    {
+        var file = await channel.Reader.ReadAsync();
+        BitmapImage image = new();
+        image.BeginInit();
+        image.UriSource = new(file);
+        image.EndInit();
+        SetAnimatedSource(imagemControle, image);
+    }
 
-            var image = new BitmapImage();
-            image.BeginInit();
-            image.UriSource = new Uri(file);
-            image.EndInit();
+    static async Task<CatFileName> GetFluffyCat(CancellationToken ct = default)
+    {
+        var file = Path.GetTempFileName();
+        var response = await HttpClient.GetAsync(Url, ct);
+        Debug.WriteLine("Mais um tananam!");
 
-            SetAnimatedSource(imagemControle, image);
-        }
-
-        static async Task<CatFileName> getFluffyCat()
-        {
-            var file = Path.GetTempFileName();
-            const string url = "https://cataas.com/cat/gif?filter=cute";
-
-            var response = await httpClient.GetAsync(url);
-            Debug.WriteLine("Mais um tanananan");
-
-            var stream = await response.Content.ReadAsStreamAsync();
-            using (var fs = File.Create(file))
-                stream.CopyTo(fs);
-
-            return file;
-        }
-
+        var stream = await response.Content.ReadAsStreamAsync(ct);
+        await using var fs = File.Create(file);
+        await stream.CopyToAsync(fs, ct);
+        return file;
     }
 }
